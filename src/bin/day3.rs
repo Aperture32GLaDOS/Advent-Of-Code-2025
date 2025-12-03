@@ -19,25 +19,20 @@ fn get_best_combination(digits_with_indices: &mut Vec<(usize, u8)>, num_digits: 
         get_best_combination(digits_with_indices, num_digits - 1, largest_after_current.0 + 1, largest_after, current_combination);
         return;
     }
-    // Vector of the largest element before the given index, preferring elements closer to the
-    // start - needs to be re-calculated as it may include digits before current_index
-    // Note that largest_after does not need to be re-calculated, as it will only include elements
-    // after and including its index, by definition
-    let largest_before: Vec<(usize, u8)> = digits_with_indices.iter().map(|x| *digits_with_indices.split_at(x.0).0.iter().rev().max_by_key(|x| x.1).unwrap_or(&(0, 0))).collect();
-    // Otherwise, we traverse the array going backwards from the largest after the current index
-    // until the largest index before our pointer will fit the number of digits
+    // Traverse the array going backwards - keep searching for the max element behind the pointer,
+    // until that max element can fit the required number of digits
     let mut pointer = largest_after_current.0;
-    let mut largest_before_largest_after = largest_before[pointer];
-    while pointer > current_index && largest_before_largest_after.0 > digits_with_indices.len() - num_digits {
-        pointer = largest_before_largest_after.0;
-        largest_before_largest_after = largest_before[pointer];
+    let mut current_element = digits_with_indices[pointer];
+    while pointer > current_index && current_element.0 > digits_with_indices.len() - num_digits {
+        current_element = *digits_with_indices.split_at(pointer).0.iter().rev().max_by_key(|x| x.1).unwrap_or(&(0, 0));
+        pointer = current_element.0;
     }
-    current_combination.push(largest_before_largest_after.1);
+    current_combination.push(current_element.1);
     // Zero out digits which will not be used anymore
-    for i in current_index..largest_before_largest_after.0 + 1 {
+    for i in current_index..current_element.0 + 1 {
         digits_with_indices[i] = (i, 0);
     }
-    get_best_combination(digits_with_indices, num_digits - 1, largest_before_largest_after.0 + 1, largest_after, current_combination);
+    get_best_combination(digits_with_indices, num_digits - 1, current_element.0 + 1, largest_after, current_combination);
 }
 
 
