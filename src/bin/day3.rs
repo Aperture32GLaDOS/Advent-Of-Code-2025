@@ -2,12 +2,12 @@ use std::{fs::File, io::Read};
 
 // Recursive method, finds the best digit after and including current_index and then finds the next
 // sub-solution of the digits after that best digit
-fn get_best_combination(digits_with_indices: &mut Vec<(usize, u8)>, num_digits: usize, current_index: usize, largest_after: Vec<(usize, u8)>, current_combination: &mut Vec<u8>) {
+fn get_best_combination(digits_with_indices: &mut Vec<(usize, u8)>, num_digits: usize, current_index: usize, current_combination: &mut Vec<u8>) {
+    let largest_after_current = *digits_with_indices.split_at(current_index).1.iter().rev().max_by_key(|x| x.1).unwrap();
     if num_digits == 1 {
-        current_combination.push(largest_after[current_index].1);
+        current_combination.push(largest_after_current.1);
         return;
     }
-    let largest_after_current = largest_after[current_index];
     // If the largest digit after the current one can fit the number of remaining digits,
     if largest_after_current.0 <= digits_with_indices.len() - num_digits {
         // Then it is optimal - push it and solve the sub-problem
@@ -16,7 +16,7 @@ fn get_best_combination(digits_with_indices: &mut Vec<(usize, u8)>, num_digits: 
         for i in current_index..largest_after_current.0 + 1 {
             digits_with_indices[i] = (i, 0);
         }
-        get_best_combination(digits_with_indices, num_digits - 1, largest_after_current.0 + 1, largest_after, current_combination);
+        get_best_combination(digits_with_indices, num_digits - 1, largest_after_current.0 + 1, current_combination);
         return;
     }
     // Traverse the array going backwards - keep searching for the max element behind the pointer,
@@ -32,7 +32,7 @@ fn get_best_combination(digits_with_indices: &mut Vec<(usize, u8)>, num_digits: 
     for i in current_index..current_element.0 + 1 {
         digits_with_indices[i] = (i, 0);
     }
-    get_best_combination(digits_with_indices, num_digits - 1, current_element.0 + 1, largest_after, current_combination);
+    get_best_combination(digits_with_indices, num_digits - 1, current_element.0 + 1, current_combination);
 }
 
 
@@ -92,9 +92,8 @@ fn not_dumb_solution(input: &String, num_digits: usize) -> Result<u64, Box<dyn s
         let mut digits_with_indices: Vec<(usize, u8)> = digits.iter().enumerate().map(|x| (x.0, *x.1)).collect();
         // Vector of the largest digit after (and including) this index, preferring digits closer
         // to the start
-        let largest_after: Vec<(usize, u8)> = digits.iter().enumerate().map(|x| *digits_with_indices.split_at(x.0).1.iter().rev().max_by_key(|x| x.1).unwrap()).collect();
         let mut best_combination = Vec::new();
-        get_best_combination(&mut digits_with_indices, num_digits, 0, largest_after, &mut best_combination);
+        get_best_combination(&mut digits_with_indices, num_digits, 0, &mut best_combination);
         let mut multiplier = 1;
         best_combination.reverse();
         for i in best_combination {
