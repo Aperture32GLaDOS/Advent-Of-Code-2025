@@ -7,20 +7,15 @@ fn get_best_combination(digits_with_indices: &mut Vec<(usize, u8)>, num_digits: 
         current_combination.push(largest_after[current_index].1);
         return;
     }
-    // Zero out all digits before the current index, so they do not affect largest_before
-    digits_with_indices.iter_mut().for_each(|x| {
-        if x.0 >= current_index {
-            return;
-        }
-        else {
-            *x = (x.0, 0);
-        }
-    });
     let largest_after_current = largest_after[current_index];
     // If the largest digit after the current one can fit the number of remaining digits,
     if largest_after_current.0 <= digits_with_indices.len() - num_digits {
         // Then it is optimal - push it and solve the sub-problem
         current_combination.push(largest_after_current.1);
+        // Zero out digits which will not be used anymore
+        for i in current_index..largest_after_current.0 + 1 {
+            digits_with_indices[i] = (i, 0);
+        }
         get_best_combination(digits_with_indices, num_digits - 1, largest_after_current.0 + 1, largest_after, current_combination);
         return;
     }
@@ -38,6 +33,10 @@ fn get_best_combination(digits_with_indices: &mut Vec<(usize, u8)>, num_digits: 
         largest_before_largest_after = largest_before[pointer];
     }
     current_combination.push(largest_before_largest_after.1);
+    // Zero out digits which will not be used anymore
+    for i in current_index..largest_before_largest_after.0 + 1 {
+        digits_with_indices[i] = (i, 0);
+    }
     get_best_combination(digits_with_indices, num_digits - 1, largest_before_largest_after.0 + 1, largest_after, current_combination);
 }
 
@@ -116,6 +115,8 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let mut file = File::open("day3.txt")?;
     file.read_to_end(&mut file_contents)?;
     let content = String::from_utf8(file_contents)?;
+    let now = std::time::Instant::now();
     println!("{}", not_dumb_solution(&content, 12)?);
+    println!("{:?}", now.elapsed());
     Ok(())
 }
