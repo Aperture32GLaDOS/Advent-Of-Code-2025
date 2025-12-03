@@ -16,11 +16,6 @@ fn get_best_combination(digits_with_indices: &mut Vec<(usize, u8)>, num_digits: 
             *x = (x.0, 0);
         }
     });
-    // Vector of the largest element before the given index, preferring elements closer to the
-    // start - needs to be re-calculated as it may include digits before current_index
-    // Note that largest_after does not need to be re-calculated, as it will only include elements
-    // after and including its index, by definition
-    let largest_before: Vec<(usize, u8)> = digits_with_indices.iter().map(|x| *digits_with_indices.split_at(x.0).0.iter().rev().max_by_key(|x| x.1).unwrap_or(&(0, 0))).collect();
     let largest_after_current = largest_after[current_index];
     // If the largest digit after the current one can fit the number of remaining digits,
     if largest_after_current.0 <= digits_with_indices.len() - num_digits {
@@ -29,6 +24,11 @@ fn get_best_combination(digits_with_indices: &mut Vec<(usize, u8)>, num_digits: 
         get_best_combination(digits_with_indices, num_digits - 1, largest_after_current.0 + 1, largest_after, current_combination);
         return;
     }
+    // Vector of the largest element before the given index, preferring elements closer to the
+    // start - needs to be re-calculated as it may include digits before current_index
+    // Note that largest_after does not need to be re-calculated, as it will only include elements
+    // after and including its index, by definition
+    let largest_before: Vec<(usize, u8)> = digits_with_indices.iter().map(|x| *digits_with_indices.split_at(x.0).0.iter().rev().max_by_key(|x| x.1).unwrap_or(&(0, 0))).collect();
     // Otherwise, we traverse the array going backwards from the largest after the current index
     // until the largest index before our pointer will fit the number of digits
     let mut pointer = largest_after_current.0;
