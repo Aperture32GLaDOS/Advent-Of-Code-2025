@@ -34,7 +34,7 @@ fn get_best_combination(digits_with_indices: &mut Vec<(usize, u8)>, num_digits: 
     let mut pointer = largest_after_current.0;
     let mut largest_before_largest_after = largest_before[pointer];
     while pointer > current_index && largest_before_largest_after.0 > digits_with_indices.len() - num_digits {
-        pointer -= 1;
+        pointer = largest_before_largest_after.0;
         largest_before_largest_after = largest_before[pointer];
     }
     current_combination.push(largest_before_largest_after.1);
