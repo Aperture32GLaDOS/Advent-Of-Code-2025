@@ -1,17 +1,17 @@
 use std::{fs::File, io::Read};
 
 // Const parameter so loop unrolling can be done
-fn get_best_combination<const NUM_DIGITS: usize>(digits_with_indices: &Vec<(usize, u8)>, mut current_index: usize, current_combination: &mut Vec<u8>) {
+fn get_best_combination<const NUM_DIGITS: usize>(digits_with_indices: &Vec<(usize, u8)>, mut current_index: usize, current_combination: &mut [u8; NUM_DIGITS]) -> Result<(), Box<dyn std::error::Error>> {
     for i in (1..NUM_DIGITS+1).rev() {
-        let largest_after_current = *digits_with_indices.split_at(digits_with_indices.len() - i + 1).0.split_at(current_index).1.iter().rev().max_by_key(|x| x.1).unwrap();
+        let largest_after_current = *digits_with_indices.split_at(digits_with_indices.len() - i + 1).0.split_at(current_index).1.iter().rev().max_by_key(|x| x.1).ok_or("Unable to get max value of digits")?;
         if i == 1 {
-            current_combination.push(largest_after_current.1);
-            return;
+            current_combination[i - 1] = largest_after_current.1;
+            return Ok(());
         }
         // If the largest digit after the current one can fit the number of remaining digits,
         if largest_after_current.0 <= digits_with_indices.len() - i {
             // Then it is optimal - push it and solve the sub-problem
-            current_combination.push(largest_after_current.1);
+            current_combination[i - 1] = largest_after_current.1;
             current_index = largest_after_current.0 + 1;
             continue;
         }
@@ -20,12 +20,13 @@ fn get_best_combination<const NUM_DIGITS: usize>(digits_with_indices: &Vec<(usiz
         let mut pointer = largest_after_current.0;
         let mut current_element = digits_with_indices[pointer];
         while pointer > current_index && current_element.0 > digits_with_indices.len() - i {
-            current_element = *digits_with_indices.split_at(pointer).0.split_at(current_index).1.iter().rev().max_by_key(|x| x.1).unwrap_or(&(0, 0));
+            current_element = *digits_with_indices.split_at(pointer).0.split_at(current_index).1.iter().rev().max_by_key(|x| x.1).ok_or("Unable to get max value of digits")?;
             pointer = current_element.0;
         }
-        current_combination.push(current_element.1);
+        current_combination[i - 1] = current_element.1;
         current_index = current_element.0 + 1;
     }
+    Ok(())
 }
 
 
@@ -39,7 +40,7 @@ fn dumb_solution(input: &String) -> Result<u64, Box<dyn std::error::Error>> {
         }
         let mut digits: Vec<u8> = Vec::new();
         for digit in line.trim().chars() {
-            digits.push(digit.to_digit(10).unwrap() as u8);
+            digits.push(digit.to_digit(10).ok_or("Unable to parse line input as digit")? as u8);
         }
         for digit_one in digits.iter().enumerate() {
             for digit_two in digits.iter().enumerate() {
@@ -80,13 +81,12 @@ fn not_dumb_solution<const NUM_DIGITS: usize>(input: &String) -> Result<u64, Box
         }
         let mut digits: Vec<u8> = Vec::with_capacity(100);
         for digit in line.trim().chars() {
-            digits.push(digit.to_digit(10).unwrap() as u8);
+            digits.push(digit.to_digit(10).ok_or("Unable to parse line character as digit")? as u8);
         }
         let digits_with_indices: Vec<(usize, u8)> = digits.iter().enumerate().map(|x| (x.0, *x.1)).collect();
-        let mut best_combination = Vec::with_capacity(NUM_DIGITS);
-        get_best_combination::<NUM_DIGITS>(&digits_with_indices, 0, &mut best_combination);
+        let mut best_combination = [0; NUM_DIGITS];
+        get_best_combination::<NUM_DIGITS>(&digits_with_indices, 0, &mut best_combination)?;
         let mut multiplier = 1;
-        best_combination.reverse();
         for i in best_combination {
             sum += (i as u64) * multiplier;
             multiplier *= 10;
