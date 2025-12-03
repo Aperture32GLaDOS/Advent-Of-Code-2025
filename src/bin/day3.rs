@@ -42,7 +42,7 @@ fn not_dumb_solution(input: &String) -> Result<u64, Box<dyn std::error::Error>> 
         // Vector of the largest digit after (and including) this index
         let largest_after: Vec<(usize, u8)> = digits.iter().enumerate().map(|x| *digits_with_indices.split_at(x.0).1.iter().rev().max_by_key(|x| x.1).unwrap()).collect();
         // Vector of the largest digit before this index
-        let largest_before: Vec<(usize, u8)> = digits.iter().enumerate().map(|x| *digits_with_indices.split_at(x.0).0.iter().rev().max_by_key(|x| x.1).unwrap_or(&(0, 0))).collect();
+        let largest_before: Vec<(usize, u8)> = digits.iter().enumerate().map(|x| *digits_with_indices.split_at(x.0).0.iter().max_by_key(|x| x.1).unwrap_or(&(0, 0))).collect();
         for i in 0..(largest_after.len() - 1) {
             if largest_after[i] != largest_after[i + 1] {
                 largest_combination = (largest_after[i].1 as u64) * 10 + (largest_after[i + 1].1 as u64);
