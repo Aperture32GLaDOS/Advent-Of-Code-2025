@@ -4,12 +4,31 @@ use std::{cell::{RefCell, RefMut}, collections::HashMap, fs::File, io::Read, mem
 struct Device {
     // Weak so that they do not cause memory leak
     connections: Vec<Weak<RefCell<Device>>>,
-    ways_to_reach: usize
+    label: String,
 }
 
 impl Device {
-    fn new() -> Self {
-        Device { connections: Vec::new(), ways_to_reach: 0 }
+    fn new(label: &str) -> Self {
+        Device { connections: Vec::new(), label: label.to_string() }
+    }
+
+    fn dfs(&self, to: &str, cache: &mut HashMap<String, usize>) -> usize {
+        if self.label == to {
+            return 1;
+        }
+        else {
+            let cache_result = cache.get(&self.label);
+            match cache_result {
+                Some(x) => {
+                    return *x;
+                }
+                None => {
+                    let dfs_result = self.connections.iter().map(|x| x.upgrade().unwrap().borrow().dfs(to, cache)).sum();
+                    cache.insert(self.label.clone(), dfs_result);
+                    return dfs_result;
+                }
+            }
+        }
     }
 }
 
@@ -23,7 +42,7 @@ fn not_dumb_solution(content: &String) -> Result<usize, Box<dyn std::error::Erro
                 device_to_modify = x.clone();
             }
             None => {
-                let new_device = Device::new();
+                let new_device = Device::new(device_to_modify_label);
                 let new_device_ref = Rc::new(RefCell::new(new_device));
                 devices.insert(device_to_modify_label, new_device_ref.clone());
                 device_to_modify = new_device_ref;
@@ -36,7 +55,7 @@ fn not_dumb_solution(content: &String) -> Result<usize, Box<dyn std::error::Erro
                     device_which_connects = x.clone();
                 }
                 None => {
-                    let new_device = Device::new();
+                    let new_device = Device::new(device_which_connects_label);
                     let new_device_ref = Rc::new(RefCell::new(new_device));
                     devices.insert(device_which_connects_label, new_device_ref.clone());
                     device_which_connects = new_device_ref;
@@ -45,21 +64,14 @@ fn not_dumb_solution(content: &String) -> Result<usize, Box<dyn std::error::Erro
             device_to_modify.borrow_mut().connections.push(Rc::downgrade(&device_which_connects));
         }
     }
-    let mut current_devices = vec![devices.get("you").unwrap().clone()];
-    let mut next_devices: Vec<_> = Vec::new();
-    while current_devices.len() != 0 {
-        for device in current_devices.iter() {
-            for connecting_device_weak in &device.borrow().connections {
-                let connecting_device = connecting_device_weak.upgrade().unwrap();
-                let mut connecting_device_mut = connecting_device.borrow_mut();
-                connecting_device_mut.ways_to_reach += 1;
-                next_devices.push(connecting_device.clone());
-            }
-        }
-        swap(&mut current_devices, &mut next_devices);
-        next_devices.clear();
-    }
-    Ok(devices.get("out").unwrap().borrow().ways_to_reach)
+    let root = devices.get("svr").unwrap().borrow();
+    let fft = devices.get("fft").unwrap().borrow();
+    let dac = devices.get("dac").unwrap().borrow();
+    let mut root_dfs_cache = HashMap::new();
+    let mut fft_dfs_cache = HashMap::new();
+    let mut dac_dfs_cache = HashMap::new();
+    let possible_ways = root.dfs("fft", &mut root_dfs_cache) * fft.dfs("dac", &mut fft_dfs_cache) * dac.dfs("out", &mut dac_dfs_cache);
+    Ok(possible_ways)
 }
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
