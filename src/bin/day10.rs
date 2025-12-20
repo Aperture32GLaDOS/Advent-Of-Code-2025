@@ -1,104 +1,57 @@
-use std::{collections::HashSet, fs::File, io::Read, mem::swap};
+use std::{fs::File, io::Read};
+use good_lp::{constraint, default_solver, variable, Expression, ProblemVariables, SolverModel, Variable};
 
-type WiringSchematic = Vec<usize>;
+type WiringSchematic = Vec<u64>;
 
 #[derive(Debug)]
 #[derive(Clone)]
 struct LightProblem {
-    lights: Vec<bool>,
-    desired_state: Vec<bool>,
-    schematics: Vec<WiringSchematic>,
-    schematics_used: Vec<usize>
+    desired_state: Vec<u64>,
+    schematics: Vec<WiringSchematic>
 }
 
 impl LightProblem {
     fn new(line: &str) -> Result<Self, Box<dyn std::error::Error>> {
-        let mut lights: Vec<bool> = Vec::new();
+        let mut desired_state: Vec<u64> = Vec::new();
         let mut schematics: Vec<WiringSchematic> = Vec::new();
-        for character in line.split_once(' ').ok_or("Line must have values separated by spaces")?.0.chars() {
-            match character {
-                '[' => {continue;}
-                ']' => {continue;}
-                '.' => {
-                    lights.push(false);
-                }
-                '#' => {
-                    lights.push(true);
-                }
-                _ => {
-                    return Err("Unknown character encountered!".into());
-                }
-            }
-            for schematic in line.split('(').skip(1) {
-                let schematic_values = schematic.split_once(')').ok_or("Wiring schematics must be surrounded by brackets")?.0;
-                let mut new_schematic: WiringSchematic = Vec::new();
-                for index in schematic_values.split(',') {
-                    new_schematic.push(index.parse()?);
-                }
-                schematics.push(new_schematic);
-            }
+        for counter_state in line.split_once('{').ok_or("Desired counter state must be contained in curly braces")?.1.split_once('}').ok_or("Desired counter state must be contained in curly braces")?.0.split(',') {
+            desired_state.push(counter_state.parse()?);
         }
-        let mut initial_lights = Vec::with_capacity(lights.len());
-        initial_lights.resize(lights.len(), false);
-        Ok(LightProblem { desired_state: lights, schematics, schematics_used: Vec::new(), lights: initial_lights})
+        for schematic in line.split('(').skip(1) {
+            let schematic_values = schematic.split_once(')').ok_or("Wiring schematics must be surrounded by brackets")?.0;
+            let mut new_schematic: WiringSchematic = Vec::with_capacity(desired_state.len());
+            new_schematic.resize(desired_state.len(), 0);
+            for index in schematic_values.split(',') {
+                new_schematic[index.parse::<usize>()?] = 1;
+            }
+            schematics.push(new_schematic);
+        }
+        Ok(LightProblem { desired_state, schematics })
     }
 
-    // Works, but is *far* too slow
-    fn naive_breadth_first_solve(&self) -> Result<Vec<usize>, Box<dyn std::error::Error>> {
-        let mut subproblems: Vec<Self> = Vec::new();
-        subproblems.push(self.clone());
-        let mut new_subproblems: Vec<Self> = Vec::with_capacity(subproblems.len());
-        // While some lights are still off...
-        while subproblems.iter().all(|x| x.lights.iter().zip(x.desired_state.iter()).all(|x| x.0 == x.1)) {
-            for subproblem in subproblems.iter() {
-                for (schematic_index, possible_schematic) in self.schematics.iter().enumerate() {
-                    let mut new_subproblem = subproblem.clone();
-                    for light_to_change in possible_schematic.iter() {
-                        new_subproblem.lights[*light_to_change] = !new_subproblem.lights[*light_to_change];
-                    }
-                    new_subproblem.schematics_used.push(schematic_index);
-                    new_subproblems.push(new_subproblem);
-                }
-            }
-            swap(&mut subproblems, &mut new_subproblems);
-            new_subproblems.clear();
+    fn solve(&self) -> Result<u64, Box<dyn std::error::Error>> {
+        // If only I could solve this without linear programming solvers... :(
+        let mut problem = ProblemVariables::new();
+        let mut coefficients: Vec<Variable> = Vec::with_capacity(self.schematics.len());
+        for _ in 0..self.schematics.len() {
+            coefficients.push(problem.add(variable().integer().min(0)));
         }
-        let solved_subproblem = subproblems.iter().find(|x| x.lights.iter().all(|x| *x)).ok_or("No subproblem found")?;
-        Ok(solved_subproblem.schematics_used.clone())
-    }
-
-    fn naive_breadth_first_solve_with_state_remembering(&self) -> Result<Vec<usize>, Box<dyn std::error::Error>> {
-        let mut subproblems: Vec<Self> = Vec::new();
-        subproblems.push(self.clone());
-        let mut new_subproblems: Vec<Self> = Vec::with_capacity(subproblems.len());
-        let mut found_states: HashSet<Vec<bool>> = HashSet::new();
-        let mut depth: usize = 1;
-        // While some lights are still off...
-        while subproblems.iter().all(|x| !x.lights.iter().zip(x.desired_state.iter()).all(|x| x.0 == x.1)) {
-            for subproblem in subproblems.iter() {
-                for (schematic_index, possible_schematic) in self.schematics.iter().enumerate() {
-                    let mut new_subproblem = subproblem.clone();
-                    for light_to_change in possible_schematic.iter() {
-                        new_subproblem.lights[*light_to_change] = !new_subproblem.lights[*light_to_change];
-                    }
-                    match found_states.get(&new_subproblem.lights) {
-                        Some(_) => {
-                            continue;
-                        }
-                        None => {
-                            new_subproblem.schematics_used.push(schematic_index);
-                            found_states.insert(new_subproblem.clone().lights);
-                            new_subproblems.push(new_subproblem);
-                        }
-                    }
-                }
+        let sum = coefficients.iter().sum::<Expression>();
+        let mut counter_states: Vec<Expression> = Vec::with_capacity(self.desired_state.len());
+        for i in 0..self.desired_state.len() {
+            let mut counter_state: Expression = Expression::from(0);
+            for (schematic, schematic_coefficient) in self.schematics.iter().zip(coefficients.iter()) {
+                counter_state += schematic[i] as f64 * *schematic_coefficient;
             }
-            swap(&mut subproblems, &mut new_subproblems);
-            new_subproblems.clear();
-            depth += 1;
+            counter_states.push(counter_state);
         }
-        let solved_subproblem = subproblems.iter().find(|x| x.lights.iter().zip(x.desired_state.iter()).all(|x| x.0 == x.1)).ok_or("No subproblem found")?;
-        Ok(solved_subproblem.schematics_used.clone())
+        let mut solver = problem.minimise(&sum).using(default_solver);
+        for (state, desired) in counter_states.iter().zip(self.desired_state.iter()) {
+            solver = solver.with(constraint!(state.clone() == *desired as f64));
+        }
+        solver.set_parameter("log", "0");
+        let solution = solver.solve()?;
+        Ok(sum.eval_with(&solution) as u64)
     }
 }
 
@@ -106,8 +59,8 @@ fn not_dumb_solution(content: &String) -> Result<u64, Box<dyn std::error::Error>
     let mut sum = 0;
     for line in content.lines() {
         let problem = LightProblem::new(line)?;
-        let solution = problem.naive_breadth_first_solve_with_state_remembering()?;
-        sum += solution.len() as u64;
+        let solution = problem.solve()?;
+        sum += solution;
     }
     Ok(sum)
 }
