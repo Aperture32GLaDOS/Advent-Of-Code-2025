@@ -1,5 +1,5 @@
 use std::{fs::File, io::Read};
-use good_lp::{constraint, default_solver, variable, Expression, ProblemVariables, SolverModel, Variable};
+use good_lp::{constraint, microlp, variable, Expression, ProblemVariables, SolverModel, Variable};
 
 type WiringSchematic = Vec<u64>;
 
@@ -45,11 +45,10 @@ impl LightProblem {
             }
             counter_states.push(counter_state);
         }
-        let mut solver = problem.minimise(&sum).using(default_solver);
+        let mut solver = problem.minimise(&sum).using(microlp);
         for (state, desired) in counter_states.iter().zip(self.desired_state.iter()) {
             solver = solver.with(constraint!(state.clone() == *desired as f64));
         }
-        solver.set_parameter("log", "0");
         let solution = solver.solve()?;
         Ok(sum.eval_with(&solution) as u64)
     }
